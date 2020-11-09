@@ -1,0 +1,670 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 62,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import math\n",
+    "from scipy import stats\n",
+    "import pandas as pd\n",
+    "import datetime\n",
+    "from datetime import datetime"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Let's load the data and take a look at our groups)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>event_name</th>\n",
+       "      <th>user_id</th>\n",
+       "      <th>timestamp</th>\n",
+       "      <th>experiment_id</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>MainScreenAppear</td>\n",
+       "      <td>4575588528974610257</td>\n",
+       "      <td>2019-07-25 07:43:36</td>\n",
+       "      <td>246</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>MainScreenAppear</td>\n",
+       "      <td>7416695313311560658</td>\n",
+       "      <td>2019-07-25 14:11:42</td>\n",
+       "      <td>246</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>PaymentScreenSuccessful</td>\n",
+       "      <td>3518123091307005509</td>\n",
+       "      <td>2019-07-25 14:28:47</td>\n",
+       "      <td>248</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>CartScreenAppear</td>\n",
+       "      <td>3518123091307005509</td>\n",
+       "      <td>2019-07-25 14:28:47</td>\n",
+       "      <td>248</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>PaymentScreenSuccessful</td>\n",
+       "      <td>6217807653094995999</td>\n",
+       "      <td>2019-07-25 14:48:42</td>\n",
+       "      <td>248</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                event_name              user_id           timestamp  \\\n",
+       "0         MainScreenAppear  4575588528974610257 2019-07-25 07:43:36   \n",
+       "1         MainScreenAppear  7416695313311560658 2019-07-25 14:11:42   \n",
+       "2  PaymentScreenSuccessful  3518123091307005509 2019-07-25 14:28:47   \n",
+       "3         CartScreenAppear  3518123091307005509 2019-07-25 14:28:47   \n",
+       "4  PaymentScreenSuccessful  6217807653094995999 2019-07-25 14:48:42   \n",
+       "\n",
+       "   experiment_id  \n",
+       "0            246  \n",
+       "1            246  \n",
+       "2            248  \n",
+       "3            248  \n",
+       "4            248  "
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df = pd.read_csv('/Users/anastasiapiterskaa/Downloads/logs_exp_us.csv',sep='\\t')\n",
+    " \n",
+    "df.columns =['event_name','user_id','timestamp','experiment_id']\n",
+    "df['timestamp'] = df['timestamp'].apply(lambda x: datetime.fromtimestamp(x))\n",
+    " \n",
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "For calculating proportions we need to know the number of users in the group. We will call groups 246 and 247 - test_1 and test_2 and 248 is control"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_1=df[df.experiment_id==246]['user_id'].unique()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "array([4575588528974610257, 7416695313311560658, 8351860793733343758, ...,\n",
+       "       4876403292056911122, 6660805781687343085, 7823752606740475984])"
+      ]
+     },
+     "execution_count": 9,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "test_1"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Number of users in the first group"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 45,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "2489"
+      ]
+     },
+     "execution_count": 45,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "len(test_1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_2=df[df.experiment_id==247]['user_id'].unique()\n",
+    "control=df[df.experiment_id==248]['user_id'].unique()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Number of users in the second group"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "2520"
+      ]
+     },
+     "execution_count": 46,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "len(test_2)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now we have lists with our users from each group and we can use it in calculation of our proportions) "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Suppose, in the middle of the project you get a pivot like the one below and you need to compare the 'conversion' of two test groups for different events. So you need to check whether two test groups are significantly different in each event."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th>experiment_id</th>\n",
+       "      <th>event_name</th>\n",
+       "      <th>246</th>\n",
+       "      <th>247</th>\n",
+       "      <th>248</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>CartScreenAppear</td>\n",
+       "      <td>1270</td>\n",
+       "      <td>1240</td>\n",
+       "      <td>1239</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>MainScreenAppear</td>\n",
+       "      <td>2456</td>\n",
+       "      <td>2482</td>\n",
+       "      <td>2501</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>OffersScreenAppear</td>\n",
+       "      <td>1545</td>\n",
+       "      <td>1530</td>\n",
+       "      <td>1538</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>PaymentScreenSuccessful</td>\n",
+       "      <td>1202</td>\n",
+       "      <td>1160</td>\n",
+       "      <td>1185</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>Tutorial</td>\n",
+       "      <td>279</td>\n",
+       "      <td>286</td>\n",
+       "      <td>282</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "experiment_id               event_name   246   247   248\n",
+       "0                     CartScreenAppear  1270  1240  1239\n",
+       "1                     MainScreenAppear  2456  2482  2501\n",
+       "2                   OffersScreenAppear  1545  1530  1538\n",
+       "3              PaymentScreenSuccessful  1202  1160  1185\n",
+       "4                             Tutorial   279   286   282"
+      ]
+     },
+     "execution_count": 18,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "pivot = df.pivot_table(index='event_name', values='user_id', columns='experiment_id', aggfunc=lambda x: x.nunique()).reset_index()\n",
+    "pivot"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "What are we actually checking? Whether there is a statistical difference in conversion aka proportion - \"Is the share of users (from all users in the test) that had \"CartScreenAppear of one test group is statistically different from another?\""
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "To do this, we need to use the test of proportions or z-score. Let's revise the example from the theory"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "p-value:  0.012621025223628068\n",
+      "Rejecting the null hypothesis: there is a significant difference between the proportions\n"
+     ]
+    }
+   ],
+   "source": [
+    "from scipy import stats as st\n",
+    "import numpy as np\n",
+    "import math as mth\n",
+    "\n",
+    "alpha = .05 # significance level\n",
+    "\n",
+    "successes = np.array([78, 120])\n",
+    "trials = np.array([830, 909])\n",
+    "\n",
+    "# success proportion in the first group:\n",
+    "p1 = successes[0]/trials[0]\n",
+    "\n",
+    "# success proportion in the second group:\n",
+    "p2 = successes[1]/trials[1]\n",
+    "\n",
+    "# success proportion in the combined dataset:\n",
+    "p_combined = (successes[0] + successes[1]) / (trials[0] + trials[1])\n",
+    "\n",
+    "# the difference between the datasets' proportions\n",
+    "difference = p1 - p2\n",
+    "# calculating the statistic in standard deviations of the standard normal distribution\n",
+    "z_value = difference / mth.sqrt(p_combined * (1 - p_combined) * (1/trials[0] + 1/trials[1]))\n",
+    "\n",
+    "# setting up the standard normal distribution (mean 0, standard deviation 1)\n",
+    "distr = st.norm(0, 1)\n",
+    "# calculating the statistic in standard deviations of the standard normal distribution\n",
+    "z_value = difference / mth.sqrt(p_combined * (1 - p_combined) * (1/trials[0] + 1/trials[1]))\n",
+    "\n",
+    "# setting up the standard normal distribution (mean 0, standard deviation 1)\n",
+    "distr = st.norm(0, 1) \n",
+    "\n",
+    "p_value = (1 - distr.cdf(abs(z_value))) * 2\n",
+    "\n",
+    "print('p-value: ', p_value)\n",
+    "\n",
+    "if (p_value < alpha):\n",
+    "    print(\"Rejecting the null hypothesis: there is a significant difference between the proportions\")\n",
+    "else:\n",
+    "    print(\"Failed to reject the null hypothesis: there is no reason to consider the proportions different\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now, in our case **success** for each group  will be the value of action from pivot table. For example, a success of CartScreenAppear for group 246 is 1270 "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "We can access this value of success directly from our pivot table)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "1270"
+      ]
+     },
+     "execution_count": 27,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "pivot[pivot.event_name=='CartScreenAppear'][246].iloc[0]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Thus, knowing the event name and the name of the group, we can access any value of success from our pivot table for any event. Keep in mind that value of trials will always be the same - the number of users in the groups)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "At first, let's get all our variables for the test)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "*group1*- the number of first group(like 246)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "*group2* - the number of second group ( like 247)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 53,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def check_hypothesis(group1,group2, event, alpha=0.05):\n",
+    "    #let's start with successes, using indexing on our pivot table\n",
+    "    successes1=pivot[pivot.event_name==event][group1].iloc[0]\n",
+    "    successes2=pivot[pivot.event_name==event][group2].iloc[0]\n",
+    "    print( \"Success for group\", group1, \"is\",successes1, \"for event\", event,\"\\n\",\n",
+    "          \"Success for group\", group2, \"is\",successes2, \"for event\", event,\"\\n\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Success for group 246 is 1270 for event CartScreenAppear \n",
+      " Success for group 247 is 1240 for event CartScreenAppear \n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "check_hypothesis(246,247, 'CartScreenAppear', alpha=0.05)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now let's add trials. Remember, trials are the total users in groups"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def check_hypothesis(group1,group2, event, alpha=0.05):\n",
+    "    #let's start with successes, using \n",
+    "    successes1=pivot[pivot.event_name==event][group1].iloc[0]\n",
+    "    successes2=pivot[pivot.event_name==event][group2].iloc[0]\n",
+    "    \n",
+    "    #for trials we can go back to original df or used a pre-aggregated data\n",
+    "    trials1=df[df.experiment_id==group1]['user_id'].nunique()\n",
+    "    trials2=df[df.experiment_id==group2]['user_id'].nunique()\n",
+    "    \n",
+    "    print( \"Success for group\", group1, \"is\",successes1, \"for event\", event,\"\\n\",\n",
+    "          \"Success for group\", group2, \"is\",successes2, \"for event\", event,\"\\n\",\n",
+    "         \"Trials for group\", group1, \"is\",trials1,\"\\n\",\n",
+    "         \"Trials for group\", group2, \"is\",trials2,\"\\n\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Success for group 246 is 1270 for event CartScreenAppear \n",
+      " Success for group 247 is 1240 for event CartScreenAppear \n",
+      " Trials for group 246 is 2489 \n",
+      " Trials for group 247 is 2520 \n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "check_hypothesis(246,247, 'CartScreenAppear', alpha=0.05)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now let's add the rest of the function!"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 69,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def check_hypothesis(group1,group2, event, alpha=0.05):\n",
+    "    #let's start with successes, using \n",
+    "    successes1=pivot[pivot.event_name==event][group1].iloc[0]\n",
+    "    successes2=pivot[pivot.event_name==event][group2].iloc[0]\n",
+    "    \n",
+    "    #for trials we can go back to original df or used a pre-aggregated data\n",
+    "    trials1=df[df.experiment_id==group1]['user_id'].nunique()\n",
+    "    trials2=df[df.experiment_id==group2]['user_id'].nunique()\n",
+    "    \n",
+    "    #proportion for success in the first group\n",
+    "    p1 = successes1/trials1\n",
+    "\n",
+    "   #proportion for success in the second group\n",
+    "    p2 = successes2/trials2\n",
+    "\n",
+    "    # proportion in a combined dataset\n",
+    "    p_combined = (successes1 + successes2) / (trials1 + trials2)\n",
+    "\n",
+    "  \n",
+    "    difference = p1 - p2\n",
+    "    \n",
+    "    \n",
+    "    z_value = difference / math.sqrt(p_combined * (1 - p_combined) * (1/trials1 + 1/trials2))\n",
+    "\n",
+    "  \n",
+    "    distr = stats.norm(0, 1) \n",
+    "\n",
+    "\n",
+    "    p_value = (1 - distr.cdf(abs(z_value))) * 2\n",
+    "\n",
+    "    print('p-value: ', p_value)\n",
+    "\n",
+    "    if (p_value < alpha):\n",
+    "        print(\"Reject H0 for\",event, 'and groups',group1,group2)\n",
+    "    else:\n",
+    "        print(\"Fail to Reject H0 for\", event,'and groups',group1,group2)  "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 70,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "p-value:  0.19817540651836918\n",
+      "Fail to Reject H0 for CartScreenAppear and groups 246 247\n"
+     ]
+    }
+   ],
+   "source": [
+    "check_hypothesis(246,247, 'CartScreenAppear', alpha=0.05)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now you can use this function to iterate over list of events or groups. Good luck!"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 74,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "p-value:  0.19817540651836918\n",
+      "Fail to Reject H0 for CartScreenAppear and groups 246 247\n",
+      "p-value:  0.5856639791209877\n",
+      "Fail to Reject H0 for MainScreenAppear and groups 246 247\n",
+      "p-value:  0.3233225048227193\n",
+      "Fail to Reject H0 for OffersScreenAppear and groups 246 247\n",
+      "p-value:  0.10902546202332886\n",
+      "Fail to Reject H0 for PaymentScreenSuccessful and groups 246 247\n",
+      "p-value:  0.8756574258016974\n",
+      "Fail to Reject H0 for Tutorial and groups 246 247\n"
+     ]
+    }
+   ],
+   "source": [
+    "for i in pivot.event_name.unique():\n",
+    "    check_hypothesis(246,247, i, alpha=0.05)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
